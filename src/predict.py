@@ -4,12 +4,14 @@ import csv
 import os
 import numpy as np
 
-def load_model(file_name):
-    model = None
-    with open(file_name, "rb") as f:
-        dill.load(f)
-    assert model is not None, "Fail to load model" + file_name
-    return model
+def load_protein_pair(input_file):
+    protein_pair = []
+    with open(input_file, "r") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            assert len(row) == 2, "invalid input file, no 2 column"
+            protein_pair.append(row)
+    return row
 
 def load_vector(base_dir, protein_pair):
     protein_to_vec = {}
@@ -22,21 +24,36 @@ def load_vector(base_dir, protein_pair):
                 protein_to_vec[p2] = np.load(vec_path_2)
     return protein_to_vec
 
-def load_protein_pair(input_file):
-    protein_pair = []
-    with open(input_file, "r") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            assert len(row) == 2, "invalid input file, no 2 column"
-            protein_pair.append(row)
-    return row
+def make_pair_vec(protein_to_vec, protein_pair_list):
+    vec_list = [None for _ in range(len(protein_pair_list))]
+    c = 0
+    for p1, p2 in protein_pair_list:
+        vec_list[c] = np.r_[protein_to_vec[p1], protein_to_vec[p2]]
+        c += 1
+    return vec_list
+
+def load_model(file_name):
+    model = None
+    with open(file_name, "rb") as f:
+        dill.load(f)
+    assert model is not None, "Fail to load model" + file_name
+    return model
 
 def predict_single_model(input_file, vec_dir, output_file):
     protein_pair_list = load_protein_pair(input_file)
     protein_to_vec = load_vector(vec_dir, protein_pair_list)
-    clf = load_model("models/model_1_550.sav")
+    protein_pair_vec = make_pair_vec(protein_to_vec, protein_pair_list)
+
+    clf = load_model("models/model_2_350.sav")
+    predict_list = clf.predict_proba(protein_pair_vec)
+    predict_list = list(map(lambda x: x[1], predict_list))
     
-    
+    with open(output_file, "w") as f:
+        for pair, proba in zip(protein_pair_list, predict_list):
+            f.write(",".join([pair[0], pair[1], str(proba)]) + "\n")
+
+def predict_stacking_model(input_file, vec_dir, output_file):
+    pass
 
 def main():
     # parse argment
